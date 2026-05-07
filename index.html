@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#060b10">
+  <title>OPS CENTER</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #060b10;
+      --bg2: #040810;
+      --bg3: #0a1520;
+      --panel-border: #0d1f30;
+      --accent: #5ab6ff;
+      --accent2: #3a7aaa;
+      --accent3: #1e5a88;
+      --accent4: #1a3a58;
+      --accent5: #0d2040;
+      --text1: #b8d4ef;
+      --text2: #7ab0d5;
+      --text3: #4a8ab5;
+      --text4: #2060a0;
+      --text5: #1a4a6e;
+      --text6: #0e2d45;
+      --mono: 'Share Tech Mono', monospace;
+      --display: 'Rajdhani', sans-serif;
+    }
+    html, body { height: 100%; background: var(--bg2); overflow-x: hidden; }
+    body { font-family: var(--display); color: var(--text1); }
+
+    /* BOOT SCREEN */
+    #boot {
+      position: fixed; inset: 0; background: var(--bg2);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px; z-index: 1000;
+      transition: opacity 0.8s ease;
+    }
+    #boot.hide { opacity: 0; pointer-events: none; }
+    .boot-logo { font-family: var(--mono); font-size: 11px; color: var(--accent3); letter-spacing: 4px; }
+    .boot-bar-wrap { width: 200px; height: 1px; background: var(--accent5); position: relative; overflow: hidden; }
+    .boot-bar { height: 1px; background: var(--accent); width: 0; animation: bootfill 1.8s ease forwards; }
+    @keyframes bootfill { to { width: 100%; } }
+    .boot-text { font-family: var(--mono); font-size: 9px; color: var(--text5); letter-spacing: 2px; animation: bootblink 0.4s step-end infinite; }
+    @keyframes bootblink { 50% { opacity: 0; } }
+
+    /* WRAPPER */
+    #app { max-width: 1400px; margin: 0 auto; padding: 12px; min-height: 100vh; }
+
+    /* TOP BAR */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 18px; background: var(--bg2);
+      border: 1px solid var(--panel-border); border-radius: 4px 4px 0 0;
+      margin-bottom: 1px;
+    }
+    .sys-id { font-family: var(--mono); font-size: 10px; color: var(--text5); letter-spacing: 3px; }
+    .sys-right { display: flex; align-items: center; gap: 14px; }
+    .live-dot { width: 5px; height: 5px; background: var(--accent3); border-radius: 50%; animation: pulse 2.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+    .sys-status { font-family: var(--mono); font-size: 10px; color: var(--text5); letter-spacing: 1px; }
+    #mode-toggle {
+      font-family: var(--mono); font-size: 9px; color: var(--text5); letter-spacing: 2px;
+      background: none; border: 1px solid var(--accent5); padding: 3px 8px; cursor: pointer;
+      border-radius: 2px; transition: all 0.2s;
+    }
+    #mode-toggle:hover { border-color: var(--accent4); color: var(--text3); }
+
+    /* MAIN GRID */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 1px;
+      background: var(--bg3);
+    }
+    .panel-full { grid-column: 1 / -1; }
+
+    /* PANELS */
+    .panel {
+      background: var(--bg);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      border: 1px solid transparent;
+    }
+    .panel.booted {
+      animation: panelBoot 0.7s ease-out forwards;
+    }
+    @keyframes panelBoot {
+      0%   { opacity: 0; border-color: transparent; }
+      20%  { opacity: 0.2; border-color: var(--accent); }
+      50%  { opacity: 0.7; border-color: var(--accent3); }
+      100% { opacity: 1; border-color: var(--panel-border); }
+    }
+    .panel.booted::after {
+      content: ''; position: absolute; left: 0; right: 0;
+      height: 60px; top: -60px;
+      background: linear-gradient(to bottom, transparent, rgba(90,182,255,0.06), transparent);
+      animation: scandown 0.6s ease-out forwards;
+    }
+    @keyframes scandown { to { top: 110%; } }
+
+    /* CORNER TICKS */
+    .panel::before {
+      content: ''; position: absolute; top: 6px; left: 6px;
+      width: 8px; height: 8px;
+      border-top: 1px solid var(--accent4);
+      border-left: 1px solid var(--accent4);
+      opacity: 0; transition: opacity 0.3s ease 0.5s;
+    }
+    .panel.booted::before { opacity: 1; }
+
+    /* PANEL LABELS */
+    .plabel {
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text5); font-weight: 700; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .plabel::before { content: ''; width: 10px; height: 1px; background: var(--text5); }
+    .plabel::after { content: ''; width: 4px; height: 4px; border: 1px solid var(--text5); transform: rotate(45deg); }
+
+    /* TIME PANEL */
+    .time-big { font-family: var(--mono); font-size: 56px; color: var(--accent); letter-spacing: -2px; line-height: 1; }
+    .time-date { font-size: 12px; color: var(--text4); letter-spacing: 2px; margin-top: 6px; font-weight: 600; }
+    .time-ampm { font-family: var(--mono); font-size: 11px; color: var(--text5); letter-spacing: 1px; margin-top: 3px; }
+
+    /* WEATHER PANEL */
+    .wx-temp { font-family: var(--mono); font-size: 48px; color: var(--accent); line-height: 1; }
+    .wx-cond { font-size: 13px; color: var(--text3); font-weight: 600; margin-top: 5px; letter-spacing: 1px; }
+    .wx-stats { display: flex; gap: 0; margin-top: 12px; }
+    .wx-stat { flex: 1; text-align: center; border-left: 1px solid var(--accent5); }
+    .wx-stat:first-child { border-left: none; }
+    .wx-val { font-family: var(--mono); font-size: 13px; color: var(--accent3); }
+    .wx-key { font-size: 9px; color: var(--text5); letter-spacing: 1px; margin-top: 2px; }
+
+    /* TARGETS PANEL */
+    .target-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--accent5); }
+    .target-row:last-child { border-bottom: none; }
+    .t-left { flex: 1; }
+    .t-name { font-size: 12px; font-weight: 600; color: var(--text2); }
+    .t-bar { height: 2px; background: var(--accent5); margin-top: 4px; border-radius: 1px; overflow: hidden; }
+    .t-fill { height: 2px; background: var(--accent2); border-radius: 1px; transition: width 1s ease; }
+    .t-val { font-family: var(--mono); font-size: 11px; color: var(--accent3); margin-left: 12px; white-space: nowrap; }
+
+    /* SCHEDULE PANEL */
+    .ev-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--accent5); }
+    .ev-row:last-child { border-bottom: none; }
+    .ev-time { font-family: var(--mono); font-size: 10px; color: var(--text4); min-width: 48px; padding-top: 2px; }
+    .ev-name { font-size: 13px; font-weight: 600; color: var(--text2); }
+    .ev-tag { display: inline-block; font-size: 9px; letter-spacing: 1px; padding: 1px 6px; border: 1px solid var(--accent5); color: var(--text5); border-radius: 1px; margin-top: 3px; }
+    .cal-connect { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px 0; }
+    .cal-connect p { font-size: 12px; color: var(--text5); letter-spacing: 1px; text-align: center; }
+    .btn-connect {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--accent3);
+      background: none; border: 1px solid var(--accent4); padding: 7px 14px; cursor: pointer;
+      border-radius: 2px; transition: all 0.2s; text-transform: uppercase;
+    }
+    .btn-connect:hover { border-color: var(--accent3); color: var(--accent); }
+
+    /* YESTERDAY PANEL */
+    .yest-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--accent5); }
+    .yest-row:last-child { border-bottom: none; }
+    .yest-icon { font-size: 14px; color: var(--accent3); margin-top: 1px; }
+    .yest-icon.miss { color: var(--accent4); }
+    .yest-main { font-size: 12px; color: var(--text3); line-height: 1.4; }
+    .yest-tag { font-size: 9px; color: var(--text5); letter-spacing: 1px; margin-top: 2px; }
+
+    /* SUGGESTIONS PANEL */
+    .sug-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--accent5); }
+    .sug-row:last-child { border-bottom: none; }
+    .diamond { width: 5px; height: 5px; border: 1px solid var(--accent3); transform: rotate(45deg); flex-shrink: 0; margin-top: 5px; }
+    .sug-main { font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .sug-src { font-size: 9px; color: var(--text5); letter-spacing: 1px; margin-top: 2px; }
+
+    /* PRIORITIES PANEL */
+    .pri-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .pri-card { padding: 10px 12px; border: 1px solid var(--accent5); border-radius: 2px; }
+    .pri-cat { font-size: 9px; color: var(--text5); letter-spacing: 2px; margin-bottom: 6px; }
+    .pri-text { font-size: 12px; color: var(--text3); line-height: 1.5; }
+
+    /* FOOTER */
+    .footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 18px; background: var(--bg2);
+      border: 1px solid var(--panel-border); border-top: none; border-radius: 0 0 4px 4px;
+      margin-top: 1px;
+    }
+    .ft { font-family: var(--mono); font-size: 9px; color: var(--text6); letter-spacing: 2px; }
+
+    /* EVENING MODE */
+    #evening-panel { display: none; }
+    #evening-panel.active { display: block; }
+    .eod-header { font-size: 14px; font-weight: 700; color: var(--accent2); letter-spacing: 2px; margin-bottom: 18px; }
+    .eod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .eod-section-label { font-size: 10px; color: var(--text5); letter-spacing: 2px; margin-bottom: 10px; font-weight: 600; }
+    .check-item { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--accent5); cursor: pointer; }
+    .check-item:last-child { border-bottom: none; }
+    .check-item input[type="checkbox"] { accent-color: var(--accent3); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
+    .check-item label { font-size: 13px; color: var(--text2); cursor: pointer; line-height: 1.3; }
+    .check-item.checked label { color: var(--text5); text-decoration: line-through; }
+    .eod-q { margin-bottom: 12px; }
+    .eod-q label { display: block; font-size: 11px; color: var(--text4); letter-spacing: 1px; margin-bottom: 5px; }
+    .eod-q textarea {
+      width: 100%; background: var(--bg3); border: 1px solid var(--accent5); color: var(--text2);
+      font-family: var(--display); font-size: 13px; padding: 8px; resize: none; border-radius: 2px;
+      height: 52px; outline: none; transition: border-color 0.2s;
+    }
+    .eod-q textarea:focus { border-color: var(--accent4); }
+    .btn-submit {
+      margin-top: 20px; width: 100%; padding: 12px;
+      background: none; border: 1px solid var(--accent3); color: var(--accent);
+      font-family: var(--mono); font-size: 11px; letter-spacing: 3px; cursor: pointer;
+      border-radius: 2px; transition: all 0.2s; text-transform: uppercase;
+    }
+    .btn-submit:hover { background: rgba(90,182,255,0.05); }
+    .eod-confirm { text-align: center; padding: 40px; }
+    .eod-confirm p { font-family: var(--mono); font-size: 12px; color: var(--text3); letter-spacing: 2px; }
+
+    /* LOADING STATES */
+    .loading { font-family: var(--mono); font-size: 11px; color: var(--text5); letter-spacing: 1px; animation: bootblink 0.8s step-end infinite; }
+
+    /* MOBILE */
+    @media (max-width: 768px) {
+      #app { padding: 8px; }
+      .main-grid { grid-template-columns: 1fr 1fr; }
+      .panel-full { grid-column: 1 / -1; }
+      .pri-grid { grid-template-columns: 1fr 1fr; }
+      .time-big { font-size: 42px; }
+      .wx-temp { font-size: 36px; }
+      .eod-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .topbar { flex-direction: column; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- BOOT SCREEN -->
+<div id="boot">
+  <div class="boot-logo">PERSONAL OPS CENTER</div>
+  <div class="boot-bar-wrap"><div class="boot-bar"></div></div>
+  <div class="boot-text">INITIALIZING SYSTEMS</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="sys-id">J.A.R.V.I.S · PERSONAL OPERATIONS CENTER</div>
+    <div class="sys-right">
+      <div class="live-dot"></div>
+      <div class="sys-status" id="topbar-time">-- : -- --</div>
+      <button id="mode-toggle" onclick="toggleMode()">EVENING CHECK-IN</button>
+    </div>
+  </div>
+
+  <!-- MORNING DASHBOARD -->
+  <div id="morning-view">
+    <div class="main-grid">
+
+      <!-- TIME -->
+      <div class="panel" data-p="1">
+        <div class="plabel">Local time</div>
+        <div class="time-big" id="clock">--:--</div>
+        <div class="time-date" id="clock-date">--</div>
+        <div class="time-ampm" id="clock-ampm">--</div>
+      </div>
+
+      <!-- WEATHER -->
+      <div class="panel" data-p="2">
+        <div class="plabel">Weather · Gainesville, FL</div>
+        <div id="weather-content"><div class="loading">FETCHING WEATHER</div></div>
+      </div>
+
+      <!-- TARGETS -->
+      <div class="panel" data-p="3">
+        <div class="plabel">Active targets</div>
+        <div id="targets-content"></div>
+      </div>
+
+      <!-- SCHEDULE -->
+      <div class="panel" data-p="4">
+        <div class="plabel">Today's schedule</div>
+        <div id="schedule-content"><div class="loading">LOADING CALENDAR</div></div>
+      </div>
+
+      <!-- YESTERDAY -->
+      <div class="panel" data-p="5">
+        <div class="plabel">Yesterday's summary</div>
+        <div id="yesterday-content"><div class="loading">LOADING</div></div>
+      </div>
+
+      <!-- SUGGESTIONS -->
+      <div class="panel" data-p="6">
+        <div class="plabel">Suggested by Claude</div>
+        <div id="suggestions-content"><div class="loading">GENERATING</div></div>
+      </div>
+
+      <!-- PRIORITIES -->
+      <div class="panel panel-full" data-p="7">
+        <div class="plabel">Standing priorities</div>
+        <div class="pri-grid" id="priorities-content"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EVENING CHECK-IN -->
+  <div id="evening-panel">
+    <div class="main-grid">
+      <div class="panel panel-full" data-p="e1" style="opacity:1;border-color:var(--panel-border)">
+        <div class="eod-header">END OF DAY · <span id="eod-date">--</span></div>
+        <div id="eod-content">
+          <div class="eod-grid">
+            <div>
+              <div class="eod-section-label">TODAY'S ITEMS — CHECK WHAT YOU DID</div>
+              <div id="eod-checklist"></div>
+            </div>
+            <div>
+              <div class="eod-section-label">QUICK DEBRIEF</div>
+              <div id="eod-questions"></div>
+            </div>
+          </div>
+          <button class="btn-submit" onclick="submitEOD()">SUBMIT &amp; CLOSE OUT DAY</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="ft">ops center · build 2.0</div>
+    <div class="ft" id="footer-right">all systems nominal</div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG — update this when Connor says to change something
+// ============================================================
+const CONFIG = {
+  supabase: {
+    url: 'YOUR_SUPABASE_URL',
+    anonKey: 'YOUR_SUPABASE_ANON_KEY'
+  },
+  google: {
+    clientId: 'YOUR_GOOGLE_CLIENT_ID',
+    apiKey: 'YOUR_GOOGLE_API_KEY',
+    calendarId: 'primary',
+    scopes: 'https://www.googleapis.com/auth/calendar.readonly'
+  },
+  goals: {
+    calories: 1800,
+    protein: 170,
+    europeDate: '2026-06-01',
+    graduationDate: '2026-05-22'
+  },
+  eveningModeHour: 18, // 6pm — switches to check-in mode
+  priorities: [
+    { cat: 'FITNESS', text: 'Visible abs before Europe. 1,800 cal · 170g protein daily.' },
+    { cat: 'BUSINESS', text: 'Grow Cason Digital. Build client base. Stay on deliverables.' },
+    { cat: 'SCHOOL', text: 'Graduate May 22. Transition to FSU Finance in the fall.' },
+    { cat: 'TRAVEL', text: 'Europe departs June 1. Planning, packing, budget locked.' }
+  ]
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let supabase = null;
+let googleTokenClient = null;
+let accessToken = null;
+let calendarEvents = [];
+let suggestions = [];
+let eodQuestions = [];
+let currentMode = 'morning';
+
+// ============================================================
+// INIT
+// ============================================================
+async function initApp() {
+  // Boot animation then reveal app
+  setTimeout(() => {
+    document.getElementById('boot').classList.add('hide');
+    document.getElementById('app').style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('boot').style.display = 'none';
+      bootPanels();
+    }, 800);
+  }, 2000);
+
+  startClock();
+  initSupabase();
+  await loadDashboard();
+  detectMode();
+}
+
+// ============================================================
+// PANEL BOOT ANIMATION — one by one
+// ============================================================
+function bootPanels() {
+  const panels = document.querySelectorAll('.panel[data-p]');
+  const delays = { '1':100, '2':400, '3':700, '4':1000, '5':1300, '6':1600, '7':1900 };
+  panels.forEach(p => {
+    const d = delays[p.dataset.p] || 0;
+    setTimeout(() => p.classList.add('booted'), d);
+  });
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function startClock() {
+  function update() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const h12s = String(h12).padStart(2, '0');
+
+    document.getElementById('clock').textContent = `${h12s}:${m}`;
+    document.getElementById('clock-ampm').textContent = `${ampm} · ${s}s`;
+
+    const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    document.getElementById('clock-date').textContent =
+      `${days[now.getDay()]} · ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+
+    document.getElementById('topbar-time').textContent =
+      `${h12s}:${m} ${ampm}`;
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+// ============================================================
+// MODE DETECTION (morning vs evening)
+// ============================================================
+function detectMode() {
+  const hour = new Date().getHours();
+  if (hour >= CONFIG.eveningModeHour) {
+    setMode('evening');
+  } else {
+    setMode('morning');
+  }
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  const morningView = document.getElementById('morning-view');
+  const eveningPanel = document.getElementById('evening-panel');
+  const toggle = document.getElementById('mode-toggle');
+
+  if (mode === 'evening') {
+    morningView.style.display = 'none';
+    eveningPanel.classList.add('active');
+    toggle.textContent = 'MORNING VIEW';
+    renderEOD();
+    document.getElementById('eod-date').textContent = getTodayStr().toUpperCase();
+  } else {
+    morningView.style.display = 'block';
+    eveningPanel.classList.remove('active');
+    toggle.textContent = 'EVENING CHECK-IN';
+  }
+}
+
+function toggleMode() {
+  setMode(currentMode === 'morning' ? 'evening' : 'morning');
+}
+
+// ============================================================
+// SUPABASE
+// ============================================================
+function initSupabase() {
+  if (CONFIG.supabase.url === 'YOUR_SUPABASE_URL') return;
+  try {
+    supabase = window.supabase.createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  } catch(e) { console.warn('Supabase init failed', e); }
+}
+
+function getTodayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getYesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
+async function loadFromSupabase(date) {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase.from('daily_data').select('*').eq('date', date).single();
+    return data;
+  } catch(e) { return null; }
+}
+
+async function saveToSupabase(date, payload) {
+  if (!supabase) return;
+  try {
+    await supabase.from('daily_data').upsert({ date, ...payload });
+  } catch(e) { console.warn('Supabase save failed', e); }
+}
+
+// ============================================================
+// LOAD DASHBOARD
+// ============================================================
+async function loadDashboard() {
+  renderTargets();
+  renderPriorities();
+  fetchWeather();
+
+  // Try loading today's cached data from Supabase
+  const todayData = await loadFromSupabase(getTodayStr());
+  const yesterdayData = await loadFromSupabase(getYesterdayStr());
+
+  // Yesterday summary
+  renderYesterday(yesterdayData);
+
+  // Suggestions — use cache if available, else generate
+  if (todayData && todayData.suggestions) {
+    suggestions = todayData.suggestions;
+    renderSuggestions(suggestions);
+    eodQuestions = todayData.eod_questions || [];
+  } else {
+    // Calendar first, then suggestions
+    await initGoogleCalendar();
+    generateSuggestions();
+  }
+
+  if (!todayData || !todayData.suggestions) {
+    await initGoogleCalendar();
+  } else if (todayData.calendar_events) {
+    calendarEvents = todayData.calendar_events;
+    renderSchedule(calendarEvents);
+  }
+}
+
+// ============================================================
+// WEATHER (wttr.in — no API key needed)
+// ============================================================
+async function fetchWeather() {
+  try {
+    const res = await fetch('https://wttr.in/Gainesville+FL?format=j1');
+    const data = await res.json();
+    const cur = data.current_condition[0];
+    const today = data.weather[0];
+    const tempF = cur.temp_F;
+    const feelsF = cur.FeelsLikeF;
+    const desc = cur.weatherDesc[0].value;
+    const humidity = cur.humidity;
+    const wind = cur.windspeedMiles;
+    const maxF = today.maxtempF;
+    const minF = today.mintempF;
+
+    document.getElementById('weather-content').innerHTML = `
+      <div class="wx-temp">${tempF}°</div>
+      <div class="wx-cond">${desc.toUpperCase()}</div>
+      <div class="wx-stats">
+        <div class="wx-stat"><div class="wx-val">${feelsF}°</div><div class="wx-key">feels</div></div>
+        <div class="wx-stat"><div class="wx-val">${humidity}%</div><div class="wx-key">humidity</div></div>
+        <div class="wx-stat"><div class="wx-val">${wind} mph</div><div class="wx-key">wind</div></div>
+        <div class="wx-stat"><div class="wx-val">${minF}° / ${maxF}°</div><div class="wx-key">lo / hi</div></div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('weather-content').innerHTML =
+      '<div style="font-size:12px;color:var(--text5)">WEATHER UNAVAILABLE</div>';
+  }
+}
+
+// ============================================================
+// GOOGLE CALENDAR
+// ============================================================
+async function initGoogleCalendar() {
+  if (CONFIG.google.clientId === 'YOUR_GOOGLE_CLIENT_ID') {
+    renderSchedule([]);
+    return;
+  }
+
+  return new Promise((resolve) => {
+    function tryInit() {
+      if (!window.google || !window.gapi) {
+        setTimeout(tryInit, 300);
+        return;
+      }
+      googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.google.clientId,
+        scope: CONFIG.google.scopes,
+        callback: async (resp) => {
+          if (resp.error) { renderSchedule([]); resolve(); return; }
+          accessToken = resp.access_token;
+          await fetchCalendarEvents();
+          resolve();
+        }
+      });
+
+      const stored = localStorage.getItem('goog_token');
+      if (stored) {
+        accessToken = stored;
+        fetchCalendarEvents().then(resolve).catch(() => {
+          requestCalendarAccess();
+          resolve();
+        });
+      } else {
+        requestCalendarAccess();
+        resolve();
+      }
+    }
+    tryInit();
+  });
+}
+
+function requestCalendarAccess() {
+  document.getElementById('schedule-content').innerHTML = `
+    <div class="cal-connect">
+      <p>CONNECT GOOGLE CALENDAR</p>
+      <button class="btn-connect" onclick="googleTokenClient.requestAccessToken()">AUTHORIZE</button>
+    </div>`;
+}
+
+async function fetchCalendarEvents() {
+  try {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${CONFIG.google.calendarId}/events?timeMin=${startOfDay}&timeMax=${endOfDay}&singleEvents=true&orderBy=startTime`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!res.ok) throw new Error('Calendar fetch failed');
+    const data = await res.json();
+    localStorage.setItem('goog_token', accessToken);
+
+    calendarEvents = (data.items || []).map(ev => ({
+      name: ev.summary || 'Untitled',
+      start: ev.start.dateTime || ev.start.date,
+      allDay: !ev.start.dateTime
+    }));
+
+    renderSchedule(calendarEvents);
+    await saveToSupabase(getTodayStr(), { calendar_events: calendarEvents });
+  } catch(e) {
+    requestCalendarAccess();
+  }
+}
+
+function formatEventTime(isoStr, allDay) {
+  if (allDay) return 'ALL DAY';
+  const d = new Date(isoStr);
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'P' : 'A';
+  return `${h % 12 || 12}:${m}${ampm}`;
+}
+
+function guessTag(name) {
+  const n = name.toLowerCase();
+  if (/class|lecture|lab|exam|study/.test(n)) return 'class';
+  if (/gym|workout|lift|cardio|run|chest|back|leg|shoulder|arm/.test(n)) return 'training';
+  if (/call|meeting|client|zoom|teams|business/.test(n)) return 'business';
+  if (/dinner|lunch|breakfast|eat|food/.test(n)) return 'food';
+  return 'event';
+}
+
+// ============================================================
+// RENDER FUNCTIONS
+// ============================================================
+function renderSchedule(events) {
+  const el = document.getElementById('schedule-content');
+  if (!events || events.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text5);letter-spacing:1px">NO EVENTS TODAY</div>';
+    return;
+  }
+  el.innerHTML = events.slice(0, 6).map(ev => `
+    <div class="ev-row">
+      <div class="ev-time">${formatEventTime(ev.start, ev.allDay)}</div>
+      <div>
+        <div class="ev-name">${ev.name}</div>
+        <div class="ev-tag">${guessTag(ev.name)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderTargets() {
+  const now = new Date();
+  const europe = new Date(CONFIG.goals.europeDate);
+  const grad = new Date(CONFIG.goals.graduationDate);
+  const daysEurope = Math.max(0, Math.ceil((europe - now) / 86400000));
+  const daysGrad = Math.max(0, Math.ceil((grad - now) / 86400000));
+
+  const europeTotal = 57; // approx days between challenge start and europe
+  const gradTotal = 30;
+
+  document.getElementById('targets-content').innerHTML = `
+    <div class="target-row">
+      <div class="t-left">
+        <div class="t-name">Daily calorie target</div>
+        <div class="t-bar"><div class="t-fill" style="width:60%"></div></div>
+      </div>
+      <div class="t-val">${CONFIG.goals.calories} cal</div>
+    </div>
+    <div class="target-row">
+      <div class="t-left">
+        <div class="t-name">Daily protein target</div>
+        <div class="t-bar"><div class="t-fill" style="width:60%"></div></div>
+      </div>
+      <div class="t-val">${CONFIG.goals.protein}g</div>
+    </div>
+    <div class="target-row">
+      <div class="t-left">
+        <div class="t-name">Europe departure</div>
+        <div class="t-bar"><div class="t-fill" style="width:${Math.min(100, Math.round((1 - daysEurope/europeTotal)*100))}%"></div></div>
+      </div>
+      <div class="t-val">${daysEurope}d</div>
+    </div>
+    <div class="target-row">
+      <div class="t-left">
+        <div class="t-name">Graduation</div>
+        <div class="t-bar"><div class="t-fill" style="width:${Math.min(100, Math.round((1 - daysGrad/gradTotal)*100))}%"></div></div>
+      </div>
+      <div class="t-val">${daysGrad}d</div>
+    </div>`;
+}
+
+function renderPriorities() {
+  document.getElementById('priorities-content').innerHTML = CONFIG.priorities.map(p => `
+    <div class="pri-card">
+      <div class="pri-cat">${p.cat}</div>
+      <div class="pri-text">${p.text}</div>
+    </div>`).join('');
+}
+
+function renderYesterday(data) {
+  const el = document.getElementById('yesterday-content');
+  if (!data || !data.summary_items || data.summary_items.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text5);letter-spacing:1px">NO DATA YET — COMPLETE YOUR FIRST CHECK-IN</div>';
+    return;
+  }
+  el.innerHTML = data.summary_items.map(item => `
+    <div class="yest-row">
+      <i class="ti ti-${item.done ? 'check' : 'x'} yest-icon ${item.done ? '' : 'miss'}" aria-hidden="true"></i>
+      <div>
+        <div class="yest-main">${item.text}</div>
+        <div class="yest-tag">${item.tag || ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderSuggestions(items) {
+  const el = document.getElementById('suggestions-content');
+  if (!items || items.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text5)">GENERATING SUGGESTIONS...</div>';
+    return;
+  }
+  el.innerHTML = items.map(s => `
+    <div class="sug-row">
+      <div class="diamond"></div>
+      <div>
+        <div class="sug-main">${s.text}</div>
+        <div class="sug-src">${s.source || ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ============================================================
+// GENERATE SUGGESTIONS (via Netlify function)
+// ============================================================
+async function generateSuggestions() {
+  document.getElementById('suggestions-content').innerHTML = '<div class="loading">GENERATING</div>';
+  try {
+    const yesterday = await loadFromSupabase(getYesterdayStr());
+    const res = await fetch('/.netlify/functions/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'suggestions',
+        context: {
+          date: getTodayStr(),
+          calendarEvents,
+          goals: CONFIG.goals,
+          priorities: CONFIG.priorities,
+          yesterdaySummary: yesterday ? yesterday.summary_items : [],
+        }
+      })
+    });
+    const data = await res.json();
+    suggestions = data.suggestions || [];
+    eodQuestions = data.eod_questions || [];
+    renderSuggestions(suggestions);
+    await saveToSupabase(getTodayStr(), { suggestions, eod_questions: eodQuestions });
+  } catch(e) {
+    // Fallback static suggestions if function unavailable
+    suggestions = [
+      { text: 'Hit your protein target before 8pm — front-load meals earlier', source: 'fitness · daily' },
+      { text: 'Review Cason Digital deliverables and send any pending follow-ups', source: 'business · daily' },
+      { text: 'Check your calendar for tomorrow and prep mentally tonight', source: 'planning · daily' }
+    ];
+    renderSuggestions(suggestions);
+  }
+}
+
+// ============================================================
+// EVENING CHECK-IN (EOD)
+// ============================================================
+function renderEOD() {
+  // Build checklist from today's calendar + suggestions
+  const allItems = [
+    ...calendarEvents.map(ev => ({ id: `cal_${ev.name}`, text: ev.name, tag: guessTag(ev.name) })),
+    ...suggestions.map((s, i) => ({ id: `sug_${i}`, text: s.text, tag: s.source }))
+  ];
+
+  document.getElementById('eod-checklist').innerHTML = allItems.map(item => {
+    const checked = localStorage.getItem(`check_${getTodayStr()}_${item.id}`) === 'true';
+    return `
+      <div class="check-item ${checked ? 'checked' : ''}" id="ci_${item.id}">
+        <input type="checkbox" id="cb_${item.id}" ${checked ? 'checked' : ''}
+          onchange="toggleCheck('${item.id}', this.checked)">
+        <label for="cb_${item.id}">${item.text}</label>
+      </div>`;
+  }).join('');
+
+  // EOD questions
+  const qs = eodQuestions.length > 0 ? eodQuestions : [
+    'Did you hit your calorie and protein targets today?',
+    'How did training go?',
+    'Any wins or progress on Cason Digital?',
+    'What\'s one thing you\'d do differently tomorrow?'
+  ];
+
+  document.getElementById('eod-questions').innerHTML = qs.map((q, i) => `
+    <div class="eod-q">
+      <label>${q}</label>
+      <textarea id="eodq_${i}" placeholder="..."></textarea>
+    </div>`).join('');
+}
+
+function toggleCheck(id, checked) {
+  localStorage.setItem(`check_${getTodayStr()}_${id}`, checked);
+  const el = document.getElementById(`ci_${id}`);
+  if (el) el.classList.toggle('checked', checked);
+}
+
+async function submitEOD() {
+  const allItems = [
+    ...calendarEvents.map(ev => ({ id: `cal_${ev.name}`, text: ev.name, tag: guessTag(ev.name) })),
+    ...suggestions.map((s, i) => ({ id: `sug_${i}`, text: s.text, tag: s.source }))
+  ];
+
+  const summary_items = allItems.map(item => ({
+    text: item.text,
+    tag: item.tag,
+    done: localStorage.getItem(`check_${getTodayStr()}_${item.id}`) === 'true'
+  }));
+
+  const responses = [];
+  document.querySelectorAll('[id^="eodq_"]').forEach(el => {
+    if (el.value.trim()) responses.push(el.value.trim());
+  });
+
+  await saveToSupabase(getTodayStr(), { summary_items, eod_responses: responses });
+
+  document.getElementById('eod-content').innerHTML = `
+    <div class="eod-confirm">
+      <p>DAY CLOSED OUT · SEE YOU TOMORROW</p>
+    </div>`;
+}
+
+// ============================================================
+// KICK OFF
+// ============================================================
+window.addEventListener('load', initApp);
+</script>
+</body>
+</html>
