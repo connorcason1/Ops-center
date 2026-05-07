@@ -506,7 +506,7 @@ function getYesterdayStr() {
 }
 
 async function loadFromSupabase(date) {
-  if (!supabaseClient) (!supabaseClient) return null;
+  if (!supabaseClient) return null;
   try {
     const { data } = await supabaseClient.
 from('daily_data').select('*').eq('date', date).single();
